@@ -1,0 +1,21 @@
+{
+  "name": "emausglobal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Emaús Global — calendario mundial de retiros de Emaús con panel de administrador",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.4.1",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true
+  }
+}
