@@ -166,6 +166,16 @@ footer{margin-top:32px;color:var(--muted);font-size:.85rem;display:flex;gap:12px
 .langtog button{border:0;background:none;padding:6px 14px;font-weight:700;letter-spacing:.06em}
 .langtog button+button{border-left:1px solid var(--line)}
 .langtog button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.admwrap{position:relative;display:inline-flex}
+.badge{position:absolute;top:-7px;right:-7px;min-width:21px;height:21px;border-radius:11px;background:var(--red);color:var(--red-ink);font:700 .75rem/21px var(--f-body);text-align:center;padding:0 5px;box-shadow:0 0 0 2px var(--bg);pointer-events:none}
+.badge.dot{min-width:13px;width:13px;height:13px;padding:0;top:-4px;right:-4px;background:var(--gold)}
+@media (prefers-reduced-motion:no-preference){.badge.dot{animation:pulse 2s ease-in-out infinite}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 2px var(--bg),0 0 0 2px transparent}50%{box-shadow:0 0 0 2px var(--bg),0 0 0 7px rgba(243,156,18,.35)}}
+.qlist{display:grid;gap:12px;margin-top:8px}
+.qmeta{font-size:.84rem;color:var(--muted)}
+.qempty{padding:28px 8px;text-align:center;color:var(--muted)}
+.intro{margin:0 0 12px;color:var(--muted);font-size:.95rem}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 /* aviso legal */
 .legal{margin-top:20px;background:var(--legal-bg);color:var(--legal-fg);border-radius:var(--r);padding:24px clamp(16px,3vw,32px) 16px}
 .legal-cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}
@@ -212,12 +222,14 @@ footer{margin-top:32px;color:var(--muted);font-size:.85rem;display:flex;gap:12px
     </div>
     <div class="top-actions">
       <div class="langtog" role="group" aria-label="Idioma de la página"><button type="button" id="lES" aria-pressed="true" lang="es">ES</button><button type="button" id="lEN" aria-pressed="false" lang="en">EN</button></div>
-      <button class="btn" id="btnAdmin" type="button">Administrador</button>
+      <button class="btn primary" id="btnPropose" type="button">Proponer un retiro</button>
+      <span class="admwrap"><button class="btn" id="btnAdmin" type="button">Administrador</button><span id="newBadge" class="badge dot" hidden></span></span>
     </div>
   </header>
 
   <div id="adminbar" class="adminbar" hidden>
     <strong><span>Modo administrador</span></strong>
+    <button class="btn small" id="btnQueue" type="button">Propuestas pendientes <span id="qCount"></span></button>
     <button class="btn small primary" id="btnNew" type="button">Nuevo retiro</button>
     <button class="btn small" id="btnLogout" type="button">Salir</button>
   </div>
@@ -292,6 +304,13 @@ footer{margin-top:32px;color:var(--muted);font-size:.85rem;display:flex;gap:12px
   <div class="actions"><button type="button" class="btn" data-close="mLogin">Cancelar</button><button type="submit" class="btn primary">Entrar</button></div>
 </form></div>
 
+<div class="modal" id="mQueue" hidden><div class="dlg" style="max-width:760px" role="dialog" aria-labelledby="hQueue">
+  <h2 id="hQueue">Propuestas pendientes</h2>
+  <p class="intro">Revisa cada propuesta. Al pulsar "Agregar a la base de datos" el retiro se publica en el calendario.</p>
+  <div class="qlist" id="queueList"></div>
+  <div class="actions"><button type="button" class="btn" data-close="mQueue">Cerrar</button></div>
+</div></div>
+
 <div class="modal" id="mEdit" hidden><form class="dlg" id="editForm" aria-labelledby="hEdit">
   <h2 id="hEdit">Retiro</h2>
   <div class="fgrid">
@@ -315,6 +334,30 @@ footer{margin-top:32px;color:var(--muted);font-size:.85rem;display:flex;gap:12px
   <datalist id="dlPaises"></datalist>
 </form></div>
 
+<div class="modal" id="mPropose" hidden><form class="dlg" id="proposeForm" aria-labelledby="hPropose">
+  <h2 id="hPropose">Proponer un retiro</h2>
+  <p class="intro">Completa los datos del retiro. Un administrador los revisará antes de publicarlos en el calendario.</p>
+  <div class="fgrid">
+    <div class="f"><label for="pPais">País *</label><input type="text" id="pPais" list="dlPaises" required></div>
+    <div class="f"><label for="pCiudad">Ciudad</label><input type="text" id="pCiudad"></div>
+    <div class="f full"><label for="pParroquia">Parroquia *</label><input type="text" id="pParroquia" required></div>
+    <div class="f"><label for="pFecha">Fecha de inicio</label><input type="date" id="pFecha"></div>
+    <div class="f"><label for="pGenero">Tipo *</label><select id="pGenero"><option value="Hombres">Hombres</option><option value="Mujeres">Mujeres</option><option value="Ambos">Ambos</option></select></div>
+    <div class="f"><label for="pIdioma">Idioma</label><select id="pIdioma"><option value="Español">Español</option><option value="Inglés">Inglés</option><option value="Por confirmar">Por confirmar</option></select></div>
+    <div class="f"></div>
+    <div class="f"><label for="pC1">Contacto #1</label><input type="text" id="pC1"></div>
+    <div class="f"><label for="pT1">Teléfono #1</label><input type="text" id="pT1"></div>
+    <div class="f"><label for="pC2">Contacto #2</label><input type="text" id="pC2"></div>
+    <div class="f"><label for="pT2">Teléfono #2</label><input type="text" id="pT2"></div>
+    <div class="f full"><label for="pSocial">Redes sociales, correo o web</label><input type="text" id="pSocial"></div>
+    <div class="f full"><label for="pNotas">Notas</label><textarea id="pNotas"></textarea></div>
+    <div class="f full"><label for="pFuente">Enlace de la fuente</label><input type="text" id="pFuente" placeholder="https://"></div>
+    <div class="f full"><label for="pEmail">Tu correo (opcional, para confirmar los datos)</label><input type="text" id="pEmail" autocomplete="email" inputmode="email"></div>
+    <div class="hp" aria-hidden="true"><label for="pWeb">No llenar este campo</label><input type="text" id="pWeb" tabindex="-1" autocomplete="off"></div>
+  </div>
+  <div class="msg err" id="proposeMsg" role="alert"></div>
+  <div class="actions"><button type="button" class="btn" data-close="mPropose">Cancelar</button><button type="submit" class="btn primary">Enviar propuesta</button></div>
+</form></div>
 <div id="toast" class="toast" hidden></div>
 </div>
 
@@ -323,7 +366,7 @@ footer{margin-top:32px;color:var(--muted);font-size:.85rem;display:flex;gap:12px
 "use strict";
 const $ = id => document.getElementById(id);
 let DB = {retiros:[],updated:""}, TOKEN = "", loaded = false, loadError = false;
-let isAdmin = false, filtersState = {q:"",pais:"",ciudad:"",mes:"",tipo:"",idi:"",past:false,view:"cards"};
+let pendingN = 0, hayPend = false, QUEUE = [], qConfirm = null, editingKind = "retiro", isAdmin = false, filtersState = {q:"",pais:"",ciudad:"",mes:"",tipo:"",idi:"",past:false,view:"cards"};
 let confirmDel = null, editingId = null;
 
 /* ---------- utilidades ---------- */
@@ -365,7 +408,17 @@ const EN={
 "País y parroquia son obligatorios.":"Country and parish are required.","El enlace de la fuente debe empezar con http:// o https://":"The source link must start with http:// or https://",
 "Guardando…":"Saving…","Alguien guardó antes que tú. La página se recargará con su versión; vuelve a hacer tu cambio.":"Someone saved before you. The page will reload with their version; make your change again.",
 "Esta sesión no puede publicar cambios. Abre la página con la cuenta de Claude que la creó.":"This session cannot publish changes. Open the page with the Claude account that created it.",
-"No se pudo guardar":"Could not save","Cargando…":"Loading…","No se pudieron cargar los retiros. Recarga la página.":"Could not load the retreats. Reload the page.","Sesión vencida. Entra de nuevo.":"Session expired. Log in again.","Cambio guardado":"Change saved","Retiro borrado":"Retreat deleted","Demasiados intentos. Espera unos minutos.":"Too many attempts. Wait a few minutes.","Tipo de retiro no válido.":"Invalid retreat type.","La fecha no es válida.":"The date is not valid.","Retiro no encontrado.":"Retreat not found."};
+"No se pudo guardar":"Could not save","Cargando…":"Loading…","No se pudieron cargar los retiros. Recarga la página.":"Could not load the retreats. Reload the page.","Sesión vencida. Entra de nuevo.":"Session expired. Log in again.","Cambio guardado":"Change saved","Retiro borrado":"Retreat deleted","Demasiados intentos. Espera unos minutos.":"Too many attempts. Wait a few minutes.","Tipo de retiro no válido.":"Invalid retreat type.","La fecha no es válida.":"The date is not valid.","Retiro no encontrado.":"Retreat not found.",
+"Proponer un retiro":"Suggest a retreat","Propuestas pendientes":"Pending suggestions","Enviar propuesta":"Submit suggestion","Cerrar":"Close",
+"Completa los datos del retiro. Un administrador los revisará antes de publicarlos en el calendario.":"Fill in the retreat details. An administrator will review them before they are published on the calendar.",
+"Tu correo (opcional, para confirmar los datos)":"Your email (optional, to confirm the details)",
+"Gracias. Un administrador revisará tu propuesta antes de publicarla.":"Thank you. An administrator will review your suggestion before publishing it.",
+"El correo no es válido.":"The email is not valid.","Hay propuestas por revisar":"There are suggestions to review",
+"Revisa cada propuesta. Al pulsar \"Agregar a la base de datos\" el retiro se publica en el calendario.":"Review each suggestion. Pressing \"Add to the database\" publishes the retreat on the calendar.",
+"No hay propuestas pendientes.":"There are no pending suggestions.","Recibida":"Received","¿Descartar esta propuesta?":"Discard this suggestion?","Sí, descartar":"Yes, discard",
+"Agregar a la base de datos":"Add to the database","Descartar":"Discard","Editar propuesta":"Edit suggestion",
+"Retiro agregado a la base de datos.":"Retreat added to the database.","Propuesta descartada.":"Suggestion discarded.",
+"Hay demasiadas propuestas pendientes. Intenta más tarde.":"There are too many pending suggestions. Try again later.","Has enviado muchas propuestas. Intenta de nuevo más tarde.":"You have sent many suggestions. Try again later.","Propuesta no encontrada.":"Suggestion not found."};
 const L=s=>lang==="en"?(EN[s]||s):s;
 const nRet=n=>n+(lang==="en"?(n===1?" retreat":" retreats"):(n===1?" retiro":" retiros"));
 const fmtDate=iso=>{const p=iso.split("-");return lang==="en"?p[1]+"/"+p[2]+"/"+p[0]:p[2]+"/"+p[1]+"/"+p[0];};
@@ -424,8 +477,31 @@ async function api(path,opt){
   if(!r.ok){const e=new Error((j&&j.error)||("Error "+r.status));e.status=r.status;throw e;}
   return j;
 }
+function renderBadge(){
+  const b=$("newBadge");
+  if(isAdmin){b.className="badge";b.textContent=pendingN;b.hidden=!pendingN;b.title=L("Hay propuestas por revisar");}
+  else{b.className="badge dot";b.textContent="";b.hidden=!hayPend;b.title=L("Hay propuestas por revisar");}
+  $("qCount").textContent=pendingN?"("+pendingN+")":"";
+}
+async function loadQueue(){
+  try{QUEUE=await api("/api/admin/propuestas");pendingN=QUEUE.length;hayPend=pendingN>0;}
+  catch(err){if(err.status===401)sessionExpired();return;}
+  renderBadge();if(!$("mQueue").hidden)renderQueue();
+}
+function renderQueue(){
+  const el=$("queueList");
+  if(!QUEUE.length){el.innerHTML='<div class="qempty">'+esc(L("No hay propuestas pendientes."))+'</div>';return;}
+  el.innerHTML=QUEUE.map(r=>{
+    const recv=(r.created_at||"").slice(0,10);
+    const meta='<div class="qmeta">'+esc(L("Recibida"))+": "+esc(recv?fmtDate(recv):"")+(r.remitente?" · "+esc(r.remitente):"")+'</div>';
+    const btns=String(qConfirm)===String(r.id)
+      ?'<div class="card-f"><span style="align-self:center;font-weight:600">'+esc(L("¿Descartar esta propuesta?"))+'</span><button class="btn small danger" data-q="delyes" data-id="'+r.id+'" type="button">'+esc(L("Sí, descartar"))+'</button><button class="btn small" data-q="delno" type="button">No</button></div>'
+      :'<div class="card-f"><button class="btn small primary" data-q="add" data-id="'+r.id+'" type="button">'+esc(L("Agregar a la base de datos"))+'</button><button class="btn small" data-q="edit" data-id="'+r.id+'" type="button">'+esc(L("Editar"))+'</button><button class="btn small danger" data-q="del" data-id="'+r.id+'" type="button">'+esc(L("Descartar"))+'</button></div>';
+    return '<article class="card"><div class="card-h">'+dateBlock(r)+'<div style="min-width:0"><h3>'+esc(r.parroquia)+'</h3><div class="where">'+esc([r.ciudad,cn(r.pais)].filter(Boolean).join(", "))+'</div></div></div>'+tags(r)+contactsHTML(r)+detailsHTML(r)+meta+btns+'</article>';
+  }).join("");
+}
 async function loadData(){
-  try{const j=await api("/api/retiros");DB.retiros=j.retiros;DB.updated=j.updated;loaded=true;loadError=false;}
+  try{const j=await api("/api/retiros");DB.retiros=j.retiros;DB.updated=j.updated;if(!isAdmin)hayPend=!!j.pendientes;loaded=true;loadError=false;}
   catch(_){loadError=true;}
   fillSelects();render();
 }
@@ -536,7 +612,7 @@ function render(){
   $("results").innerHTML=html;
   $("vCards").setAttribute("aria-pressed",f.view==="cards"); $("vTable").setAttribute("aria-pressed",f.view==="table");
   $("foot").textContent=(lang==="en"?DB.retiros.length+" retreats listed · updated ":DB.retiros.length+" retiros registrados · actualizado ")+(DB.updated||"").slice(0,10);
-  $("adminbar").hidden=!isAdmin;
+  $("adminbar").hidden=!isAdmin;renderBadge();
   $("btnAdmin").textContent=isAdmin?"Administrador ✓":L("Administrador");
 }
 
@@ -562,8 +638,8 @@ $("fclear").addEventListener("click",clearFilters);
 const open=id=>{$(id).hidden=false;const f=$(id).querySelector("input,select,textarea");if(f)f.focus();};
 const close=id=>{$(id).hidden=true;};
 document.addEventListener("click",e=>{const c=e.target.closest("[data-close]");if(c)close(c.dataset.close);});
-document.addEventListener("keydown",e=>{if(e.key==="Escape")["mLogin","mEdit"].forEach(close);});
-function setAdmin(v){isAdmin=v;if(!v){TOKEN="";confirmDel=null;}try{v?sessionStorage.setItem("emaus_tok",TOKEN):sessionStorage.removeItem("emaus_tok");}catch(_){}render();}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")["mLogin","mEdit","mQueue","mPropose"].forEach(close);});
+function setAdmin(v){isAdmin=v;if(!v){TOKEN="";confirmDel=null;qConfirm=null;QUEUE=[];pendingN=0;close("mQueue");loadData();}else loadQueue();try{v?sessionStorage.setItem("emaus_tok",TOKEN):sessionStorage.removeItem("emaus_tok");}catch(_){}render();}
 function sessionExpired(){setAdmin(false);toast(L("Sesión vencida. Entra de nuevo."));}
 $("btnAdmin").addEventListener("click",()=>{ if(isAdmin){$("adminbar").scrollIntoView({block:"nearest"});return;} $("loginMsg").textContent="";open("mLogin");});
 $("loginForm").addEventListener("submit",async e=>{e.preventDefault();
@@ -575,9 +651,9 @@ $("loginForm").addEventListener("submit",async e=>{e.preventDefault();
 $("btnLogout").addEventListener("click",()=>setAdmin(false));
 $("btnNew").addEventListener("click",()=>openEdit(null));
 const F={pais:"ePais",ciudad:"eCiudad",parroquia:"eParroquia",fecha:"eFecha",genero:"eGenero",idioma:"eIdioma",contacto1:"eC1",tel1:"eT1",contacto2:"eC2",tel2:"eT2",social:"eSocial",notas:"eNotas",fuente:"eFuente"};
-function openEdit(id){
-  editingId=id;const r=id?DB.retiros.find(x=>String(x.id)===String(id)):{genero:"Hombres",idioma:"Español"};
-  $("hEdit").textContent=id?L("Editar retiro"):L("Nuevo retiro");$("editMsg").textContent="";
+function openEdit(id,kind){
+  editingKind=kind||"retiro";editingId=id;const src=editingKind==="propuesta"?QUEUE:DB.retiros;const r=id?src.find(x=>String(x.id)===String(id)):{genero:"Hombres",idioma:"Español"};
+  $("hEdit").textContent=editingKind==="propuesta"?L("Editar propuesta"):id?L("Editar retiro"):L("Nuevo retiro");$("editMsg").textContent="";
   for(const k in F) $(F[k]).value=r[k]||"";
   open("mEdit");
 }
@@ -587,13 +663,51 @@ $("editForm").addEventListener("submit",async e=>{e.preventDefault();
   if(rec.fuente&&!/^https?:\/\//i.test(rec.fuente)){$("editMsg").textContent=L("El enlace de la fuente debe empezar con http:// o https://");return;}
   const btn=$("editForm").querySelector("button[type=submit]");btn.disabled=true;
   try{
-    if(editingId) await api("/api/admin/retiros/"+editingId,{method:"PUT",body:JSON.stringify(rec)});
-    else await api("/api/admin/retiros",{method:"POST",body:JSON.stringify(rec)});
-    close("mEdit");await loadData();toast(L("Cambio guardado"));
+    if(editingKind==="propuesta"){
+      const q=QUEUE.find(x=>String(x.id)===String(editingId));rec.remitente=q?q.remitente:"";
+      await api("/api/admin/propuestas/"+editingId,{method:"PUT",body:JSON.stringify(rec)});
+      close("mEdit");await loadQueue();toast(L("Cambio guardado"));
+    }else{
+      if(editingId) await api("/api/admin/retiros/"+editingId,{method:"PUT",body:JSON.stringify(rec)});
+      else await api("/api/admin/retiros",{method:"POST",body:JSON.stringify(rec)});
+      close("mEdit");await loadData();toast(L("Cambio guardado"));
+    }
   }catch(err){
     if(err.status===401){close("mEdit");sessionExpired();}else $("editMsg").textContent=L(err.message);
   }finally{btn.disabled=false;}
 });
+$("btnQueue").addEventListener("click",async()=>{qConfirm=null;open("mQueue");await loadQueue();renderQueue();});
+$("queueList").addEventListener("click",async e=>{
+  const b=e.target.closest("[data-q]");if(!b||!isAdmin)return;const a=b.dataset.q,id=b.dataset.id;
+  if(a==="edit")return openEdit(id,"propuesta");
+  if(a==="del"){qConfirm=id;return renderQueue();}
+  if(a==="delno"){qConfirm=null;return renderQueue();}
+  b.disabled=true;
+  try{
+    if(a==="add"){await api("/api/admin/propuestas/"+id+"/aprobar",{method:"POST"});toast(L("Retiro agregado a la base de datos."));await loadData();}
+    else if(a==="delyes"){await api("/api/admin/propuestas/"+id,{method:"DELETE"});qConfirm=null;toast(L("Propuesta descartada."));}
+    await loadQueue();
+  }catch(err){if(err.status===401)sessionExpired();else toast(L(err.message));b.disabled=false;}
+});
+setInterval(()=>{if(isAdmin)loadQueue();},60000);
+
+/* ---------- proponer un retiro ---------- */
+const P={pais:"pPais",ciudad:"pCiudad",parroquia:"pParroquia",fecha:"pFecha",genero:"pGenero",idioma:"pIdioma",contacto1:"pC1",tel1:"pT1",contacto2:"pC2",tel2:"pT2",social:"pSocial",notas:"pNotas",fuente:"pFuente",remitente:"pEmail"};
+$("btnPropose").addEventListener("click",()=>{
+  for(const k in P)$(P[k]).value="";$("pGenero").value="Hombres";$("pIdioma").value="Español";$("pWeb").value="";$("proposeMsg").textContent="";open("mPropose");
+});
+$("proposeForm").addEventListener("submit",async e=>{e.preventDefault();
+  const rec={};for(const k in P)rec[k]=$(P[k]).value.trim();rec.web=$("pWeb").value;
+  const m=$("proposeMsg");
+  if(!rec.pais||!rec.parroquia){m.textContent=L("País y parroquia son obligatorios.");return;}
+  if(rec.fuente&&!/^https?:\/\//i.test(rec.fuente)){m.textContent=L("El enlace de la fuente debe empezar con http:// o https://");return;}
+  if(rec.remitente&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rec.remitente)){m.textContent=L("El correo no es válido.");return;}
+  const btn=$("proposeForm").querySelector("button[type=submit]");btn.disabled=true;
+  try{await api("/api/propuestas",{method:"POST",body:JSON.stringify(rec)});close("mPropose");toast(L("Gracias. Un administrador revisará tu propuesta antes de publicarla."));}
+  catch(err){m.textContent=L(err.message);}
+  finally{btn.disabled=false;}
+});
+
 $("results").addEventListener("click",async e=>{const b=e.target.closest("[data-act]");if(!b)return;const a=b.dataset.act,id=b.dataset.id;
   if(a==="clear")return clearFilters();
   if(!isAdmin)return;

@@ -124,6 +124,9 @@ Dockerfile         imagen node:22-alpine
 
 - `GET /api/retiros` público, lista todos los retiros.
 - `POST /api/admin/login` con `{user, pass}`, devuelve un token (12 h).
+- `POST /api/propuestas` (público, límite 8 por hora y 300 pendientes): recibe una propuesta de retiro con los mismos campos de la base más `remitente` (correo opcional).
+- `GET /api/admin/propuestas`, `PUT /api/admin/propuestas/:id`, `POST /api/admin/propuestas/:id/aprobar` (copia a `retiros` y borra la propuesta), `DELETE /api/admin/propuestas/:id` (descartar).
+- `GET /api/retiros` incluye `pendientes` (true/false) para mostrar la señal junto al botón Administrador.
 - `POST /api/admin/retiros`, `PUT /api/admin/retiros/:id`, `DELETE /api/admin/retiros/:id` con el encabezado `Authorization: Bearer <token>`.
 - `GET /health` para comprobar que el servicio responde.
 

@@ -42,6 +42,27 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_retiros_fecha ON retiros (fecha);
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS propuestas (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    pais       TEXT NOT NULL,
+    ciudad     TEXT NOT NULL DEFAULT '',
+    parroquia  TEXT NOT NULL,
+    fecha      TEXT NOT NULL DEFAULT '',
+    genero     TEXT NOT NULL CHECK (genero IN ('Hombres','Mujeres','Ambos')),
+    idioma     TEXT NOT NULL DEFAULT 'Por confirmar',
+    contacto1  TEXT NOT NULL DEFAULT '',
+    tel1       TEXT NOT NULL DEFAULT '',
+    contacto2  TEXT NOT NULL DEFAULT '',
+    tel2       TEXT NOT NULL DEFAULT '',
+    social     TEXT NOT NULL DEFAULT '',
+    notas      TEXT NOT NULL DEFAULT '',
+    fuente     TEXT NOT NULL DEFAULT '',
+    remitente  TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+  );
+`);
+
 const COLS = ['pais','ciudad','parroquia','fecha','genero','idioma','contacto1','tel1','contacto2','tel2','social','notas','fuente'];
 const GENEROS = ['Hombres', 'Mujeres', 'Ambos'];
 const IDIOMAS = ['Español', 'Inglés', 'Por confirmar'];
@@ -55,6 +76,15 @@ function clean(body) {
   if (d.fecha && !/^\d{4}-\d{2}-\d{2}$/.test(d.fecha)) return { error: 'La fecha no es válida.' };
   if (d.fuente && !/^https?:\/\//i.test(d.fuente)) return { error: 'El enlace de la fuente debe empezar con http:// o https://' };
   return { data: d };
+}
+
+function cleanPropuesta(body) {
+  const r = clean(body);
+  if (r.error) return r;
+  const remitente = String(body?.remitente ?? '').trim().slice(0, 200);
+  if (remitente && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(remitente)) return { error: 'El correo no es válido.' };
+  r.data.remitente = remitente;
+  return r;
 }
 
 const insertSQL = `INSERT INTO retiros (${COLS.join(',')}) VALUES (${COLS.map(c => '@' + c).join(',')})`;
@@ -102,6 +132,11 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '20kb' }));
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'], maxAge: '5m' }));
 
+const proposeLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 8, standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Has enviado muchas propuestas. Intenta de nuevo más tarde.' } });
+const MAX_PENDIENTES = 300;
+const pendientes = () => db.prepare('SELECT COUNT(*) AS n FROM propuestas').get().n;
+
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false,
   message: { error: 'Demasiados intentos. Espera unos minutos.' } });
 
@@ -111,7 +146,16 @@ app.get('/api/retiros', (req, res) => {
   const retiros = db.prepare('SELECT id, ' + COLS.join(', ') + ' FROM retiros ORDER BY fecha = \'\', fecha, pais, parroquia').all();
   const updated = db.prepare('SELECT MAX(updated_at) AS u FROM retiros').get().u || '';
   res.setHeader('Cache-Control', 'no-cache');
-  res.json({ retiros, updated });
+  res.json({ retiros, updated, pendientes: pendientes() > 0 });
+});
+
+app.post('/api/propuestas', proposeLimiter, (req, res) => {
+  if (String(req.body?.web ?? '').trim()) return res.status(201).json({ ok: true }); // trampa para bots
+  const { data, error } = cleanPropuesta(req.body);
+  if (error) return res.status(400).json({ error });
+  if (pendientes() >= MAX_PENDIENTES) return res.status(503).json({ error: 'Hay demasiadas propuestas pendientes. Intenta más tarde.' });
+  db.prepare(`INSERT INTO propuestas (${COLS.join(',')}, remitente) VALUES (${COLS.map(c => '@' + c).join(',')}, @remitente)`).run(data);
+  res.status(201).json({ ok: true });
 });
 
 // ── Administrador ──
@@ -138,6 +182,36 @@ app.put('/api/admin/retiros/:id', requireAdmin, (req, res) => {
 });
 app.delete('/api/admin/retiros/:id', requireAdmin, (req, res) => {
   db.prepare('DELETE FROM retiros WHERE id = ?').run(Number(req.params.id));
+  res.json({ ok: true });
+});
+
+// Propuestas pendientes de revisión
+app.get('/api/admin/propuestas', requireAdmin, (req, res) => {
+  res.json(db.prepare('SELECT id, ' + COLS.join(', ') + ', remitente, created_at FROM propuestas ORDER BY created_at, id').all());
+});
+app.put('/api/admin/propuestas/:id', requireAdmin, (req, res) => {
+  const { data, error } = cleanPropuesta(req.body);
+  if (error) return res.status(400).json({ error });
+  const info = db.prepare(`UPDATE propuestas SET ${COLS.map(c => c + '=@' + c).join(', ')}, remitente=@remitente WHERE id=@id`)
+    .run({ ...data, id: Number(req.params.id) });
+  if (!info.changes) return res.status(404).json({ error: 'Propuesta no encontrada.' });
+  res.json({ ok: true });
+});
+app.post('/api/admin/propuestas/:id/aprobar', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const row = db.prepare('SELECT * FROM propuestas WHERE id = ?').get(id);
+  if (!row) return res.status(404).json({ error: 'Propuesta no encontrada.' });
+  const { data, error } = clean(row);
+  if (error) return res.status(400).json({ error });
+  const nuevo = db.transaction(() => {
+    const info = db.prepare(insertSQL).run(data);
+    db.prepare('DELETE FROM propuestas WHERE id = ?').run(id);
+    return info.lastInsertRowid;
+  })();
+  res.status(201).json({ id: nuevo });
+});
+app.delete('/api/admin/propuestas/:id', requireAdmin, (req, res) => {
+  db.prepare('DELETE FROM propuestas WHERE id = ?').run(Number(req.params.id));
   res.json({ ok: true });
 });
 
