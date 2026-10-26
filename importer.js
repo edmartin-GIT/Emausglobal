@@ -39,6 +39,15 @@ function genero(v) {
   return '';
 }
 
+function idioma(v) {
+  const k = norm(v);
+  if (!k) return { v: '' };
+  if (/\b(espanol|castellano|spanish|es|esp)\b/.test(k) && !/\b(ingles|english|en)\b/.test(k)) return { v: 'Español' };
+  if (/\b(ingles|english|en|eng)\b/.test(k) && !/\b(espanol|spanish|es)\b/.test(k)) return { v: 'Inglés' };
+  if (/\b(por confirmar|tbd|tba)\b/.test(k)) return { v: 'Por confirmar' };
+  return { v: 'Por confirmar', aviso: `Idioma no reconocido ("${String(v).trim()}"): quedó como Por confirmar.` };
+}
+
 const MESES = {
   enero: 1, ene: 1, january: 1, jan: 1, febrero: 2, feb: 2, february: 2, marzo: 3, mar: 3, march: 3, abril: 4, abr: 4, april: 4, apr: 4,
   mayo: 5, may: 5, junio: 6, jun: 6, june: 6, julio: 7, jul: 7, july: 7, agosto: 8, ago: 8, august: 8, aug: 8,
@@ -68,10 +77,9 @@ function fecha(v, hoy) {
   if ((m = texto.match(/\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2}|\d{4})\b/))) {
     let a = +m[1], b = +m[2], y = +m[3];
     if (y < 100) y += 2000;
-    let d = a, mo = b, aviso;
-    if (a <= 12 && b > 12) { d = b; mo = a; }                  // formato mes/día
-    else if (a <= 12 && b <= 12 && a !== b) aviso = `Fecha "${texto}" leída como día/mes/año.`;
-    if (valida(y, mo, d)) return { fecha: `${y}-${pad(mo)}-${pad(d)}`, aviso, texto };
+    let mo = a, d = b;                                          // el archivo usa MM/DD/YYYY
+    if (a > 12 && b <= 12) { d = a; mo = b; }                   // 25/12/2027: solo puede ser día/mes
+    if (valida(y, mo, d)) return { fecha: `${y}-${pad(mo)}-${pad(d)}`, texto };
   }
   // Texto con nombre de mes: "5 al 7 de marzo de 2027", "March 5-7, 2027", "12-14 mayo"
   const palabras = k.split(' ');
@@ -97,12 +105,14 @@ const CAMPOS = {
   pais: ['pais', 'country'],
   ciudad: ['ciudad', 'city'],
   tipo: ['tipo', 'tipo de retiro', 'genero', 'type'],
-  fechas: ['fechas', 'fecha', 'date', 'dates', 'fecha de inicio'],
+  idioma: ['idioma', 'language', 'lengua'],
+  notas: ['notas', 'nota', 'observaciones', 'notes', 'comentarios'],
+  fechas: ['fecha de inicio', 'fechas', 'fecha', 'date', 'dates', 'start date', 'inicio'],
   lugar: ['lugar parroquia', 'lugar', 'parroquia', 'lugar o parroquia', 'parish', 'place'],
   contacto: ['contacto', 'contact', 'contactos'],
   tel: ['telefono email', 'telefono', 'email', 'correo', 'telefono o email', 'telefono correo', 'phone', 'phone email'],
 };
-const ORDEN = ['pais', 'ciudad', 'tipo', 'fechas', 'lugar', 'contacto', 'tel'];
+const ORDEN = ['pais', 'ciudad', 'lugar', 'fechas', 'tipo', 'idioma', 'contacto', 'tel', 'notas'];
 
 function detectarColumnas(filas) {
   for (let i = 0; i < Math.min(filas.length, 10); i++) {
@@ -154,6 +164,8 @@ function analizar(hojas, { ya = new Set(), existentes = [], hoy } = {}) {
       const tipoRaw = cell(f, 'tipo');
       const g = genero(tipoRaw);
       if (!g) errores.push(tipoRaw ? `Tipo no reconocido ("${tipoRaw}").` : 'Falta el tipo (Hombres, Mujeres o Ambos).');
+      const id = idioma(cell(f, 'idioma'));
+      if (id.aviso) avisos.push(id.aviso);
       const p = pais(cell(f, 'pais'), existentes);
       if (!p) errores.push('Falta el país.');
       const parroquia = String(cell(f, 'lugar')).slice(0, 300);
@@ -161,12 +173,13 @@ function analizar(hojas, { ya = new Set(), existentes = [], hoy } = {}) {
       if (!fe.fecha && !fe.aviso) avisos.push('Sin fecha.');
       const c = partirContactos(cell(f, 'contacto'), cell(f, 'tel'));
       const notas = [
+        String(cell(f, 'notas')).slice(0, 1500),
         fe.texto && /[a-z]/i.test(fe.texto) ? `Fechas según el archivo: ${fe.texto}.` : (fe.aviso && fe.texto ? `Fecha original: ${fe.texto}.` : ''),
         c.extra,
       ].filter(Boolean).join(' ');
       const r = {
         hoja: h.sheet, linea: det.inicio + i + 1,
-        pais: p, ciudad: String(cell(f, 'ciudad')).slice(0, 300), parroquia, fecha: fe.fecha, genero: g,
+        pais: p, ciudad: String(cell(f, 'ciudad')).slice(0, 300), parroquia, fecha: fe.fecha, genero: g, idioma: id.v,
         contacto1: c.contacto1, tel1: c.tel1, contacto2: c.contacto2, tel2: c.tel2, social: c.social, notas,
         avisos, errores, duplicada: '',
       };

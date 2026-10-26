@@ -313,13 +313,13 @@ footer{margin-top:32px;color:var(--muted);font-size:.85rem;display:flex;gap:12px
 <div class="modal" id="mImport" hidden><div class="dlg" style="max-width:1040px" role="dialog" aria-labelledby="hImport">
   <h2 id="hImport">Importar retiros desde Excel</h2>
   <div id="impStep1">
-    <p class="intro">Sube un archivo .xlsx con estas columnas, en este orden: País, Ciudad, Tipo, Fechas, Lugar / Parroquia, Contacto, Teléfono / Email. Primero verás una vista previa y nada se guarda hasta que confirmes.</p>
+    <p class="intro">Sube un archivo .xlsx con estas columnas, en este orden: País, Ciudad, Lugar / Parroquia, Fecha de Inicio (MM/DD/AAAA), Tipo, Idioma, Contacto, Teléfono / Email, Notas. Primero verás una vista previa y nada se guarda hasta que confirmes.</p>
     <p class="intro"><a href="/plantilla_retiros.xlsx" download>Descargar plantilla de ejemplo</a></p>
     <div class="f"><label for="impFile">Archivo Excel (.xlsx)</label><input type="file" id="impFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
   </div>
   <div id="impStep2" hidden>
     <p class="intro" id="impSummary"></p>
-    <div class="f" style="max-width:280px;margin-bottom:12px"><label for="impIdioma">Idioma para todas las filas</label><select id="impIdioma"><option value="Por confirmar">Por confirmar</option><option value="Español">Español</option><option value="Inglés">Inglés</option></select></div>
+    <div class="f" style="max-width:280px;margin-bottom:12px"><label for="impIdioma">Idioma para filas sin idioma</label><select id="impIdioma"><option value="Por confirmar">Por confirmar</option><option value="Español">Español</option><option value="Inglés">Inglés</option></select></div>
     <div class="tablewrap" style="max-height:48vh;overflow:auto"><table class="imp-t" id="impTable"></table></div>
   </div>
   <div class="msg err" id="impMsg" role="alert"></div>
@@ -431,8 +431,8 @@ const EN={
 "Guardando…":"Saving…","Alguien guardó antes que tú. La página se recargará con su versión; vuelve a hacer tu cambio.":"Someone saved before you. The page will reload with their version; make your change again.",
 "Esta sesión no puede publicar cambios. Abre la página con la cuenta de Claude que la creó.":"This session cannot publish changes. Open the page with the Claude account that created it.",
 "No se pudo guardar":"Could not save","Cargando…":"Loading…","No se pudieron cargar los retiros. Recarga la página.":"Could not load the retreats. Reload the page.","Sesión vencida. Entra de nuevo.":"Session expired. Log in again.","Cambio guardado":"Change saved","Retiro borrado":"Retreat deleted","Demasiados intentos. Espera unos minutos.":"Too many attempts. Wait a few minutes.","Tipo de retiro no válido.":"Invalid retreat type.","La fecha no es válida.":"The date is not valid.","Importar Excel":"Import Excel","Contacto":"Contact","Importar retiros desde Excel":"Import retreats from Excel",
-"Sube un archivo .xlsx con estas columnas, en este orden: País, Ciudad, Tipo, Fechas, Lugar / Parroquia, Contacto, Teléfono / Email. Primero verás una vista previa y nada se guarda hasta que confirmes.":"Upload an .xlsx file with these columns, in this order: Country, City, Type, Dates, Place / Parish, Contact, Phone / Email. You will see a preview first and nothing is saved until you confirm.",
-"Descargar plantilla de ejemplo":"Download sample template","Archivo Excel (.xlsx)":"Excel file (.xlsx)","Idioma para todas las filas":"Language for all rows",
+"Sube un archivo .xlsx con estas columnas, en este orden: País, Ciudad, Lugar / Parroquia, Fecha de Inicio (MM/DD/AAAA), Tipo, Idioma, Contacto, Teléfono / Email, Notas. Primero verás una vista previa y nada se guarda hasta que confirmes.":"Upload an .xlsx file with these columns, in this order: Country, City, Place / Parish, Start Date (MM/DD/YYYY), Type, Language, Contact, Phone / Email, Notes. You will see a preview first and nothing is saved until you confirm.",
+"Descargar plantilla de ejemplo":"Download sample template","Archivo Excel (.xlsx)":"Excel file (.xlsx)","Idioma para filas sin idioma":"Language for rows without one",
 "Leyendo el archivo…":"Reading the file…","Importando…":"Importing…","El archivo supera 5 MB.":"The file is larger than 5 MB.",
 "filas leídas":"rows read","listas para importar":"ready to import","duplicadas":"duplicates","con errores":"with errors","Desmarca las filas que no quieras importar.":"Uncheck the rows you do not want to import.",
 "Estado":"Status","Teléfono / Email":"Phone / Email","Lista":"Ready","Importar":"Import","retiros importados":"retreats imported","omitidos por duplicado":"skipped as duplicates",
@@ -715,11 +715,11 @@ function impCount(){return IMP.filter(r=>r.on).length;}
 function impRender(){
   const t=IMP.length,err=IMP.filter(r=>r.errores.length).length,dup=IMP.filter(r=>!r.errores.length&&r.duplicada).length,ok=t-err-dup;
   $("impSummary").innerHTML="<b>"+t+"</b> "+esc(L("filas leídas"))+" · <b>"+ok+"</b> "+esc(L("listas para importar"))+" · <b>"+dup+"</b> "+esc(L("duplicadas"))+" · <b>"+err+"</b> "+esc(L("con errores"))+". "+esc(L("Desmarca las filas que no quieras importar."));
-  const head=["","#",L("Estado"),L("País"),L("Ciudad"),L("Tipo"),L("Fecha"),L("Parroquia"),L("Contacto"),L("Teléfono / Email")].map(h=>"<th>"+esc(h)+"</th>").join("");
+  const head=["","#",L("Estado"),L("País"),L("Ciudad"),L("Tipo"),L("Idioma"),L("Fecha"),L("Parroquia"),L("Contacto"),L("Teléfono / Email")].map(h=>"<th>"+esc(h)+"</th>").join("");
   const body=IMP.map((r,i)=>{
     const st=[].concat(r.errores.map(x=>'<div class="e">'+esc(L(x))+'</div>'),r.duplicada?['<div class="d">'+esc(L(r.duplicada))+'</div>']:[],r.avisos.map(x=>'<div class="w">'+esc(L(x))+'</div>')).join("")||'<div class="w">'+esc(L("Lista"))+'</div>';
     const ct=[r.contacto1,r.contacto2].filter(Boolean).join(" / "),tl=[r.tel1,r.tel2,r.social].filter(Boolean).join(" / ");
-    return '<tr class="'+(r.on?"":"off")+'"><td><input type="checkbox" data-i="'+i+'" aria-label="'+esc(L("Importar"))+'"'+(r.on?" checked":"")+(r.errores.length?" disabled":"")+'></td><td>'+r.linea+'</td><td class="imp-st">'+st+'</td><td>'+esc(cn(r.pais))+'</td><td>'+esc(r.ciudad)+'</td><td>'+esc(r.genero?L(r.genero):"")+'</td><td>'+esc(r.fecha?fmtDate(r.fecha):"")+'</td><td>'+esc(r.parroquia)+'</td><td>'+esc(ct)+'</td><td>'+esc(tl)+'</td></tr>';
+    return '<tr class="'+(r.on?"":"off")+'"><td><input type="checkbox" data-i="'+i+'" aria-label="'+esc(L("Importar"))+'"'+(r.on?" checked":"")+(r.errores.length?" disabled":"")+'></td><td>'+r.linea+'</td><td class="imp-st">'+st+'</td><td>'+esc(cn(r.pais))+'</td><td>'+esc(r.ciudad)+'</td><td>'+esc(r.genero?L(r.genero):"")+'</td><td>'+esc(r.idioma?L(r.idioma):"—")+'</td><td>'+esc(r.fecha?fmtDate(r.fecha):"")+'</td><td>'+esc(r.parroquia)+'</td><td>'+esc(ct)+'</td><td>'+esc(tl)+'</td></tr>';
   }).join("");
   $("impTable").innerHTML="<thead><tr>"+head+"</tr></thead><tbody>"+body+"</tbody>";
   const n=impCount();$("impGo").textContent=L("Importar")+" "+n;$("impGo").disabled=!n;

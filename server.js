@@ -246,7 +246,7 @@ app.post('/api/admin/import/commit', requireAdmin, express.json({ limit: '3mb' }
   let importadas = 0, omitidas = 0, invalidas = 0;
   db.transaction(() => {
     for (const r of lista) {
-      const { data } = clean({ ...r, idioma, fuente: '' });
+      const { data } = clean({ ...r, idioma: IDIOMAS.includes(r.idioma) ? r.idioma : idioma, fuente: '' });
       if (!data) { invalidas++; continue; }
       const k = claveDe(data);
       if (ya.has(k)) { omitidas++; continue; }
