@@ -129,7 +129,7 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   next();
 });
-app.use(express.json({ limit: '20kb' }));
+app.use((req, res, next) => req.path.startsWith('/api/admin/import/') ? next() : express.json({ limit: '20kb' })(req, res, next));
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'], maxAge: '5m' }));
 
 const proposeLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 8, standardHeaders: true, legacyHeaders: false,
@@ -213,6 +213,49 @@ app.post('/api/admin/propuestas/:id/aprobar', requireAdmin, (req, res) => {
 app.delete('/api/admin/propuestas/:id', requireAdmin, (req, res) => {
   db.prepare('DELETE FROM propuestas WHERE id = ?').run(Number(req.params.id));
   res.json({ ok: true });
+});
+
+// ── Importar desde Excel (solo administrador) ──
+const { analizar, claveDe } = require('./importer');
+const MAX_IMPORT = 2000;
+app.post('/api/admin/import/preview', requireAdmin, express.raw({ type: () => true, limit: '5mb' }), async (req, res) => {
+  try {
+    if (!Buffer.isBuffer(req.body) || req.body.length < 100) return res.status(400).json({ error: 'No se recibió ningún archivo.' });
+    if (req.body.slice(0, 2).toString() !== 'PK') return res.status(400).json({ error: 'El archivo debe ser Excel (.xlsx). Si es .xls o .csv, ábrelo y guárdalo como .xlsx.' });
+    const { default: readXlsx } = await import('read-excel-file/node');
+    let hojas;
+    try { hojas = await readXlsx(req.body); }
+    catch (e) { return res.status(400).json({ error: 'No pude leer el archivo. Verifica que sea un Excel (.xlsx) válido.' }); }
+    const ya = new Set(db.prepare('SELECT pais, parroquia, fecha FROM retiros').all().map(claveDe));
+    const existentes = db.prepare('SELECT DISTINCT pais FROM retiros').all().map(r => r.pais);
+    const { rows, leidas } = analizar(hojas, { ya, existentes });
+    if (!rows.length) return res.status(400).json({ error: 'El archivo no tiene filas con datos.' });
+    if (rows.length > MAX_IMPORT) return res.status(400).json({ error: `El archivo tiene más de ${MAX_IMPORT} filas. Divídelo en partes.` });
+    res.json({ rows, leidas });
+  } catch (e) {
+    console.error('import preview', e);
+    res.status(500).json({ error: 'Error al procesar el archivo.' });
+  }
+});
+app.post('/api/admin/import/commit', requireAdmin, express.json({ limit: '3mb' }), (req, res) => {
+  const lista = Array.isArray(req.body?.rows) ? req.body.rows : null;
+  if (!lista || !lista.length) return res.status(400).json({ error: 'No hay filas para importar.' });
+  if (lista.length > MAX_IMPORT) return res.status(400).json({ error: `Máximo ${MAX_IMPORT} filas por importación.` });
+  const idioma = IDIOMAS.includes(req.body?.idioma) ? req.body.idioma : 'Por confirmar';
+  const ya = new Set(db.prepare('SELECT pais, parroquia, fecha FROM retiros').all().map(claveDe));
+  let importadas = 0, omitidas = 0, invalidas = 0;
+  db.transaction(() => {
+    for (const r of lista) {
+      const { data } = clean({ ...r, idioma, fuente: '' });
+      if (!data) { invalidas++; continue; }
+      const k = claveDe(data);
+      if (ya.has(k)) { omitidas++; continue; }
+      ya.add(k);
+      db.prepare(insertSQL).run(data);
+      importadas++;
+    }
+  })();
+  res.status(201).json({ importadas, omitidas, invalidas });
 });
 
 app.listen(PORT, () => console.log(`Emaús Global escuchando en :${PORT}`));

@@ -127,6 +127,8 @@ Dockerfile         imagen node:22-alpine
 - `POST /api/propuestas` (público, límite 8 por hora y 300 pendientes): recibe una propuesta de retiro con los mismos campos de la base más `remitente` (correo opcional).
 - `GET /api/admin/propuestas`, `PUT /api/admin/propuestas/:id`, `POST /api/admin/propuestas/:id/aprobar` (copia a `retiros` y borra la propuesta), `DELETE /api/admin/propuestas/:id` (descartar).
 - `GET /api/retiros` incluye `pendientes` (true/false) para mostrar la señal junto al botón Administrador.
+- `POST /api/admin/import/preview`: recibe el `.xlsx` (cuerpo binario, máx. 5 MB) y devuelve las filas interpretadas con errores, avisos y duplicados. No guarda nada.
+- `POST /api/admin/import/commit`: recibe `{idioma, rows}` con las filas confirmadas y las inserta en `retiros` (omite duplicados por país + parroquia + fecha). Plantilla de ejemplo: `/plantilla_retiros.xlsx`.
 - `POST /api/admin/retiros`, `PUT /api/admin/retiros/:id`, `DELETE /api/admin/retiros/:id` con el encabezado `Authorization: Bearer <token>`.
 - `GET /health` para comprobar que el servicio responde.
 

@@ -8,7 +8,7 @@ RUN apk add --no-cache python3 make g++
 COPY package*.json ./
 RUN npm install --omit=dev
 
-COPY server.js ./
+COPY server.js importer.js ./
 COPY public ./public
 COPY seed ./seed
 
